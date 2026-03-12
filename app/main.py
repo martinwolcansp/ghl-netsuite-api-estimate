@@ -29,7 +29,6 @@ app = FastAPI(
 
 app.include_router(netsuite_webhooks.router)
 
-
 # =========================
 # Health check
 # =========================

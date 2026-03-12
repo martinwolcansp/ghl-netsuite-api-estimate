@@ -1,25 +1,29 @@
 from fastapi import APIRouter, Request
 import logging
 
-router = APIRouter(prefix="/webhook/netsuite", tags=["NetSuite Webhooks"])
+router = APIRouter(
+    prefix="/webhook/netsuite",
+    tags=["NetSuite Webhooks"]
+)
 
 logger = logging.getLogger("netsuite_webhooks")
 
 
-@router.post("/estimate-approved-test")
-async def estimate_approved_test(request: Request):
+@router.post("/estimate-approved")
+async def estimate_approved(request: Request):
 
     try:
 
         payload = await request.json()
         headers = dict(request.headers)
 
-        logger.info("========== NETSUITE WEBHOOK RECIBIDO ==========")
+        logger.info("========== NETSUITE ESTIMATE APPROVED ==========")
         logger.info(f"Headers: {headers}")
         logger.info(f"Payload: {payload}")
 
         return {
             "status": "received",
+            "event": "estimate-approved",
             "payload": payload
         }
 
