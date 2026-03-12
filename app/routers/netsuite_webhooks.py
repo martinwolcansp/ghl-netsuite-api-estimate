@@ -24,14 +24,14 @@ async def estimate_approved(request: Request):
                 return {"status": "error", "message": f"Falta el campo {field}"}
 
         # Conversión de tipos
-        estimate_id = str(payload["estimateId"])  # GHL acepta string
+        estimate_id = str(payload["estimateId"])
         opportunity_id = str(payload["opportunityId"])
         monto = float(payload["montoPresupuesto"])
 
         result = sync_estimate_to_ghl(
-            estimate_id,
-            opportunity_id,
-            monto
+            estimate_id=estimate_id,
+            opportunity_id=opportunity_id,
+            monto=monto
         )
 
         return {"status": "processed", "ghl_response": result}

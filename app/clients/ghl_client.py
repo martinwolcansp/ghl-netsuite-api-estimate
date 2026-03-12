@@ -4,14 +4,19 @@ import logging
 
 logger = logging.getLogger("ghl_client")
 
-def update_opportunity(opportunity_id, monetary_value, estimate_id):
+def update_opportunity(opportunity_id, monetary_value, estimate_id, pipeline_id, stage_id):
     url = f"{GHL_BASE_URL}/opportunities/{opportunity_id}"
+
     headers = {
         "Authorization": f"Bearer {GHL_API_KEY}",
         "Content-Type": "application/json",
         "Version": "2021-07-28"
     }
+
     payload = {
+        "pipelineId": pipeline_id,
+        "pipelineStageId": stage_id,
+        "status": "open",
         "monetaryValue": monetary_value,
         "customFields": [
             {
