@@ -1,3 +1,4 @@
+#core/config.py
 import os
 
 GHL_API_KEY = os.getenv("GHL_API_KEY")

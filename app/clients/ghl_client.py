@@ -1,3 +1,4 @@
+#clients/ghl_client.py
 import requests
 from app.core.config import GHL_API_KEY, GHL_BASE_URL, GHL_PIPELINE_ID, GHL_STAGE_ID
 import logging
