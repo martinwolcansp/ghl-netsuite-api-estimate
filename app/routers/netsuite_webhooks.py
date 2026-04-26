@@ -18,7 +18,6 @@ logger = logging.getLogger("netsuite_webhooks")
 async def estimate_approved(request: Request):
 
     try:
-
         payload = await request.json()
 
         logger.info("========== NETSUITE ESTIMATE APPROVED ==========")
@@ -35,10 +34,7 @@ async def estimate_approved(request: Request):
             if field not in payload:
                 return JSONResponse(
                     status_code=400,
-                    content={
-                        "status": "error",
-                        "message": f"Falta el campo {field}"
-                    }
+                    content={"status": "error", "message": f"Falta {field}"}
                 )
 
         estimate_id = str(payload["estimateId"])
@@ -46,44 +42,40 @@ async def estimate_approved(request: Request):
         monto = float(payload["montoPresupuesto"])
         contact_id = payload["contactIdGHL"]
 
-        # 🔥 NUEVO: capturar estado
+        # 🔥 opcionales nuevos
         estado_ghl = payload.get("estadoGHL")
+        es_manual = payload.get("esManual", False)
+        estado_ns_id = payload.get("estadoNsId")
 
-        logger.info(f"Estado GHL recibido: {estado_ghl}")
+        logger.info(f"Estado GHL: {estado_ghl}")
+        logger.info(f"Manual mode: {es_manual}")
+        logger.info(f"Estado NS ID: {estado_ns_id}")
 
         result = sync_estimate_to_ghl(
             estimate_id=estimate_id,
             opportunity_id=opportunity_id,
             monto=monto,
             contact_id=contact_id,
-            estado_ghl=estado_ghl  # 🔥 CLAVE
+            estado_ghl=estado_ghl,
+            es_manual=es_manual,
+            estado_ns_id=estado_ns_id
         )
 
         if "error" in result:
             return JSONResponse(
                 status_code=400,
-                content={
-                    "status": "error",
-                    "ghl_response": result
-                }
+                content={"status": "error", "ghl_response": result}
             )
 
         return JSONResponse(
             status_code=200,
-            content={
-                "status": "processed",
-                "ghl_response": result
-            }
+            content={"status": "processed", "ghl_response": result}
         )
 
     except Exception as e:
-
         logger.error(f"Error procesando webhook: {str(e)}")
 
         return JSONResponse(
             status_code=500,
-            content={
-                "status": "error",
-                "message": str(e)
-            }
+            content={"status": "error", "message": str(e)}
         )

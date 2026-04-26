@@ -1,24 +1,35 @@
 # clients/ghl_client.py
 
 import requests
-from app.core.config import GHL_API_KEY, GHL_BASE_URL, GHL_PIPELINE_ID, GHL_STAGE_ID
 import logging
+from app.core.config import GHL_API_KEY, GHL_BASE_URL
 
 logger = logging.getLogger("ghl_client")
 
 
-def map_estado_to_status(estado):
+def map_status(estado):
     mapping = {
+        "open": "open",
         "Abierto": "open",
         "Ganado": "won",
-        "Perdido": "lost"
+        "Perdido": "lost",
+        "won": "won",
+        "lost": "lost"
     }
-    return mapping.get(estado)
+    return mapping.get(estado, "open")
 
 
-def update_opportunity(opportunity_id, monetary_value, estimate_id, estado_ghl=None):
+def update_opportunity(
+    opportunity_id,
+    monetary_value,
+    estimate_id,
+    status=None,
+    pipeline_stage=None
+):
     """
-    Actualiza una oportunidad en GHL
+    Actualiza oportunidad en GHL correctamente:
+    - status: open / won / lost
+    - pipeline_stage: stageId real del pipeline
     """
 
     url = f"{GHL_BASE_URL}/opportunities/{opportunity_id}"
@@ -29,17 +40,14 @@ def update_opportunity(opportunity_id, monetary_value, estimate_id, estado_ghl=N
         "Version": "2021-07-28"
     }
 
-    # 🔥 NUEVO: determinar status correctamente
-    status = map_estado_to_status(estado_ghl)
+    # ===============================
+    # NORMALIZACIÓN
+    # ===============================
 
-    if not status:
-        logger.warning(f"Estado no mapeado, usando default OPEN: {estado_ghl}")
-        status = "open"
+    status_final = map_status(status)
 
     payload = {
-        "pipelineId": GHL_PIPELINE_ID,
-        "pipelineStageId": GHL_STAGE_ID,
-        "status": status,
+        "status": status_final,
         "monetaryValue": monetary_value,
         "customFields": [
             {
@@ -49,17 +57,25 @@ def update_opportunity(opportunity_id, monetary_value, estimate_id, estado_ghl=N
         ]
     }
 
-    logger.info(f"Estado recibido NS: {estado_ghl} → status GHL: {status}")
-    logger.info(f"Enviando payload a GHL: {payload}")
+    # 🔥 SOLO si viene stage lo aplicamos
+    if pipeline_stage:
+        payload["pipelineStageId"] = pipeline_stage
+
+    logger.info(f"Payload GHL FINAL: {payload}")
 
     try:
         response = requests.put(url, json=payload, headers=headers, timeout=10)
         response.raise_for_status()
+
         result = response.json()
 
-        logger.info(f"Oportunidad {opportunity_id} actualizada correctamente en GHL: {result}")
+        logger.info(
+            f"Oportunidad {opportunity_id} actualizada OK | "
+            f"status={status_final} | stage={pipeline_stage}"
+        )
+
         return result
 
     except requests.RequestException as e:
-        logger.error(f"Error al actualizar oportunidad {opportunity_id}: {str(e)}")
+        logger.error(f"Error GHL update: {str(e)}")
         return {"error": str(e)}
