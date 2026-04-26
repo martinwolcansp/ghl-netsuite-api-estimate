@@ -1,4 +1,5 @@
 # services/ghl_service.py
+
 import logging
 import requests
 
@@ -15,13 +16,14 @@ logger = logging.getLogger("ghl_service")
 GHL_BASE_URL = "https://services.leadconnectorhq.com"
 
 
-def sync_estimate_to_ghl(estimate_id, opportunity_id, monto, contact_id):
+def sync_estimate_to_ghl(estimate_id, opportunity_id, monto, contact_id, estado_ghl=None):
 
     logger.info("===== SINCRONIZANDO ESTIMATE NETSUITE → GHL =====")
     logger.info(f"contactId: {contact_id}")
     logger.info(f"opportunityId NS: {opportunity_id}")
     logger.info(f"estimateId: {estimate_id}")
     logger.info(f"monto: {monto}")
+    logger.info(f"Estado GHL recibido: {estado_ghl}")
 
     headers = {
         "Authorization": f"Bearer {GHL_API_KEY}",
@@ -76,7 +78,7 @@ def sync_estimate_to_ghl(estimate_id, opportunity_id, monto, contact_id):
             break
 
     if not matching_opportunity:
-        logger.warning("No se encontró oportunidad que coincida con el valor de NetSuite.")
+        logger.warning("No se encontró oportunidad que coincida con NetSuite.")
         return {"error": "Opportunity not found"}
 
     ghl_opportunity_id = matching_opportunity.get("id")
@@ -98,11 +100,12 @@ def sync_estimate_to_ghl(estimate_id, opportunity_id, monto, contact_id):
 
     logger.info("Actualizando oportunidad en GHL...")
 
+    # 🔥 FIX CLAVE: usar estado dinámico
     result = update_opportunity(
         opportunity_id=ghl_opportunity_id,
         monetary_value=monto,
         estimate_id=estimate_id,
-        status="won"
+        estado_ghl=estado_ghl
     )
 
     return result

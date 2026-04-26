@@ -46,11 +46,17 @@ async def estimate_approved(request: Request):
         monto = float(payload["montoPresupuesto"])
         contact_id = payload["contactIdGHL"]
 
+        # 🔥 NUEVO: capturar estado
+        estado_ghl = payload.get("estadoGHL")
+
+        logger.info(f"Estado GHL recibido: {estado_ghl}")
+
         result = sync_estimate_to_ghl(
             estimate_id=estimate_id,
             opportunity_id=opportunity_id,
             monto=monto,
-            contact_id=contact_id
+            contact_id=contact_id,
+            estado_ghl=estado_ghl  # 🔥 CLAVE
         )
 
         if "error" in result:
