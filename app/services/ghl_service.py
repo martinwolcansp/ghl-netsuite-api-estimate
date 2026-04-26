@@ -16,7 +16,13 @@ logger = logging.getLogger("ghl_service")
 GHL_BASE_URL = "https://services.leadconnectorhq.com"
 
 
-def sync_estimate_to_ghl(estimate_id, opportunity_id, monto, contact_id, estado_ghl=None):
+def sync_estimate_to_ghl(
+    estimate_id,
+    opportunity_id,
+    monto,
+    contact_id,
+    estado_ghl=None
+):
 
     logger.info("===== SINCRONIZANDO ESTIMATE NETSUITE → GHL =====")
     logger.info(f"contactId: {contact_id}")
@@ -58,7 +64,7 @@ def sync_estimate_to_ghl(estimate_id, opportunity_id, monto, contact_id, estado_
     matching_opportunity = None
 
     # ===============================
-    # Filtrar por custom field NS
+    # Filtrar por NetSuite ID
     # ===============================
 
     for opp in opportunities:
@@ -85,22 +91,33 @@ def sync_estimate_to_ghl(estimate_id, opportunity_id, monto, contact_id, estado_
 
     monetary_value_actual = matching_opportunity.get("monetaryValue")
     pipeline_stage_actual = matching_opportunity.get("pipelineStageId")
+    status_actual = matching_opportunity.get("status")
 
     logger.info(f"Oportunidad encontrada: {ghl_opportunity_id}")
     logger.info(f"MonetaryValue actual: {monetary_value_actual}")
     logger.info(f"PipelineStage actual: {pipeline_stage_actual}")
+    logger.info(f"Status actual: {status_actual}")
 
     # ===============================
-    # Validación para evitar doble update
+    # VALIDACIÓN MEJORADA
     # ===============================
 
-    if monetary_value_actual and pipeline_stage_actual == GHL_STAGE_ID:
-        logger.info("La oportunidad ya fue actualizada previamente.")
+    already_synced = (
+        str(monetary_value_actual) == str(monto)
+        and pipeline_stage_actual == GHL_STAGE_ID
+        and status_actual == (estado_ghl or status_actual)
+    )
+
+    if already_synced:
+        logger.info("La oportunidad ya está sincronizada (sin cambios detectados).")
         return {"status": "already_updated"}
 
     logger.info("Actualizando oportunidad en GHL...")
 
-    # 🔥 FIX CLAVE: usar estado dinámico
+    # ===============================
+    # UPDATE
+    # ===============================
+
     result = update_opportunity(
         opportunity_id=ghl_opportunity_id,
         monetary_value=monto,
