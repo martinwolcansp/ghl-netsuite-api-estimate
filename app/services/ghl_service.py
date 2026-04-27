@@ -13,14 +13,11 @@ logger = logging.getLogger("ghl_service")
 GHL_BASE_URL = "https://services.leadconnectorhq.com"
 
 
-# ===============================
-# MAPEO NETSUITE → GHL (ÚNICO SOURCE OF TRUTH)
-# ===============================
 NS_TO_GHL = {
     "12": {"stage_id": "7068ac99-7f3a-4e57-ae7c-088acf5b629f", "status": "won"},
-    "8":  {"stage_id": "ba115218-902b-4901-a90c-ec99c738d856", "status": "open"},
-    "11": {"stage_id": "ba115218-902b-4901-a90c-ec99c738d856", "status": "open"},
-    "10": {"stage_id": "ba115218-902b-4901-a90c-ec99c738d856", "status": "open"},
+    "8":  {"stage_id": "ba115218-902b-4e57-ae7c-088acf5b629f", "status": "open"},
+    "11": {"stage_id": "ba115218-902b-4e57-ae7c-088acf5b629f", "status": "open"},
+    "10": {"stage_id": "ba115218-902b-4e57-ae7c-088acf5b629f", "status": "open"},
     "14": {"stage_id": "e2adaf6d-79d7-4dcc-ae0e-616f3e16d965", "status": "lost"},
     "18": {"stage_id": "7068ac99-7f3a-4e57-ae7c-088acf5b629f", "status": "won"},
     "13": {"stage_id": "7068ac99-7f3a-4e57-ae7c-088acf5b629f", "status": "won"},
@@ -34,15 +31,15 @@ def sync_estimate_to_ghl(
     contact_id,
     estado_ns_id=None,
     es_manual=False,
-    estado_ghl=None
+    estado_ghl=None,
+    pipeline_stage_id=None
 ):
 
     logger.info("===== SYNC NS → GHL =====")
-    logger.info(f"estimate: {estimate_id}")
-    logger.info(f"opp NS: {opportunity_id}")
-    logger.info(f"estado_ns_id: {estado_ns_id}")
-    logger.info(f"es_manual: {es_manual}")
 
+    # ===============================
+    # SEARCH OPPORTUNITY
+    # ===============================
     resp = requests.get(
         f"{GHL_BASE_URL}/opportunities/search",
         headers={
@@ -83,9 +80,26 @@ def sync_estimate_to_ghl(
     ghl_id = matching["id"]
 
     # ===============================
-    # DECISIÓN DE NEGOCIO
+    # DECISION TREE (IMPORTANTE)
     # ===============================
-    if es_manual:
+
+    stage_id = None
+    status = None
+
+    # 🔥 1. OVERRIDE MANUAL (máxima prioridad)
+    if estado_ghl:
+        if estado_ghl.lower() in ["abierto", "open"]:
+            stage_id = "ba115218-902b-4e57-ae7c-088acf5b629f"
+            status = "open"
+        elif estado_ghl.lower() in ["ganado", "won"]:
+            stage_id = "7068ac99-7f3a-4e57-ae7c-088acf5b629f"
+            status = "won"
+        elif estado_ghl.lower() in ["perdido", "lost"]:
+            stage_id = "e2adaf6d-79d7-4dcc-ae0e-616f3e16d965"
+            status = "lost"
+
+    # 🔥 2. MAPPING NS
+    elif es_manual and estado_ns_id:
         mapping = NS_TO_GHL.get(str(estado_ns_id))
         if not mapping:
             return {"error": "state_not_mapped"}
@@ -93,24 +107,30 @@ def sync_estimate_to_ghl(
         stage_id = mapping["stage_id"]
         status = mapping["status"]
 
+    # 🔥 3. AUTOMÁTICO
     else:
-        # AUTOMÁTICO: Compra → Ganado
         stage_id = "7068ac99-7f3a-4e57-ae7c-088acf5b629f"
         status = "won"
 
     # ===============================
-    # VALIDACIÓN REAL (IMPORTANTE)
+    # VALIDACIÓN REAL (robusta)
     # ===============================
+    def norm(x):
+        return str(x).lower() if x is not None else ""
+
     already = (
-        str(matching.get("monetaryValue")) == str(monto)
+        norm(matching.get("monetaryValue")) == norm(monto)
         and matching.get("pipelineStageId") == stage_id
         and matching.get("status") == status
     )
 
     if already:
-        logger.info("Sin cambios")
+        logger.info("Sin cambios detectados")
         return {"status": "already_updated"}
 
+    # ===============================
+    # UPDATE
+    # ===============================
     return update_opportunity(
         opportunity_id=ghl_id,
         monetary_value=monto,
