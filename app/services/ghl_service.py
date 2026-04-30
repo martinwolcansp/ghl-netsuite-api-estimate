@@ -146,10 +146,22 @@ def sync_estimate_to_ghl(
     # ===============================
     logger.info(f"FINAL UPDATE → stage={stage_id} status={status}")
 
+    #return update_opportunity(
+    #    opportunity_id=ghl_id,
+    #    monetary_value=monto,
+    #    estimate_id=estimate_id,
+    #    status=status,
+    #    pipeline_stage_id=stage_id
+    #)
+
+    payload = {
+        "monetaryValue": monto,
+        "status": status,
+        "pipelineStageId": stage_id,
+        "estimateId": estimate_id
+    }
+
     return update_opportunity(
         opportunity_id=ghl_id,
-        monetary_value=monto,
-        estimate_id=estimate_id,
-        status=status,
-        pipeline_stage_id=stage_id
+        payload=payload
     )
