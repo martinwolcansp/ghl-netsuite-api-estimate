@@ -1,5 +1,3 @@
-#app/service/ghl_service.py
-
 import logging
 import requests
 
@@ -35,7 +33,7 @@ def normalize_status(value: str):
 
 
 # ===============================
-# MAIN SYNC (SIN LÓGICA DE NEGOCIO)
+# MAIN SYNC (ESTIMATE → GHL)
 # ===============================
 def sync_estimate_to_ghl(
     estimate_id,
@@ -53,7 +51,7 @@ def sync_estimate_to_ghl(
     logger.info(f"pipeline_stage_id: {pipeline_stage_id}")
 
     # ===============================
-    # NORMALIZACIÓN
+    # NORMALIZACIÓN STATUS
     # ===============================
     status = normalize_status(estado_ghl)
 
@@ -108,7 +106,12 @@ def sync_estimate_to_ghl(
 
     for opp in opportunities:
         for cf in opp.get("customFields", []):
-            value = cf.get("fieldValue") or cf.get("fieldValueString")
+
+            value = (
+                cf.get("fieldValue")
+                or cf.get("fieldValueString")
+                or cf.get("value")
+            )
 
             if (
                 cf.get("id") == CUSTOM_FIELD_NETSUITE_OPPORTUNITY_ID
@@ -148,19 +151,16 @@ def sync_estimate_to_ghl(
     # ===============================
     logger.info(f"FINAL UPDATE → stage={stage_id} status={status}")
 
-    #return update_opportunity(
-    #    opportunity_id=ghl_id,
-    #    monetary_value=monto,
-    #    estimate_id=estimate_id,
-    #    status=status,
-    #    pipeline_stage_id=stage_id
-    #)
-
     payload = {
         "monetaryValue": monto,
         "status": status,
         "pipelineStageId": stage_id,
-        "estimateId": estimate_id
+        "customFields": [
+            {
+                "key": "netsuite_estimate_id",
+                "field_value": str(estimate_id)
+            }
+        ]
     }
 
     return update_opportunity(
