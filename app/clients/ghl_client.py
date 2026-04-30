@@ -1,3 +1,5 @@
+# app/clients/ghl_client.py
+
 import requests
 import logging
 from app.core.config import GHL_API_KEY, GHL_BASE_URL
@@ -21,7 +23,7 @@ def map_status(status):
 
 
 # ===============================
-# VALIDACIÓN BÁSICA DE PAYLOAD
+# VALIDACIÓN BÁSICA
 # ===============================
 def validate_payload(payload):
     errors = []
@@ -44,15 +46,9 @@ def validate_payload(payload):
 
 
 # ===============================
-# UPDATE OPPORTUNITY (DEBUG MODE)
+# UPDATE OPPORTUNITY (UNIFICADO)
 # ===============================
-def update_opportunity(
-    opportunity_id,
-    monetary_value,
-    estimate_id,
-    status=None,
-    pipeline_stage_id=None
-):
+def update_opportunity(opportunity_id, payload):
 
     url = f"{GHL_BASE_URL}/opportunities/{opportunity_id}"
 
@@ -63,41 +59,25 @@ def update_opportunity(
     }
 
     # ===============================
-    # NORMALIZACIÓN
+    # NORMALIZACIÓN STATUS
     # ===============================
-    status_final = map_status(status)
-
-    payload = {
-        "status": status_final,
-        "monetaryValue": float(monetary_value),
-        "customFields": [
-            {
-                "key": "netsuite_estimate_id",
-                "field_value": str(estimate_id)
-            }
-        ]
-    }
-
-    if pipeline_stage_id:
-        payload["pipelineStageId"] = pipeline_stage_id
+    if "status" in payload:
+        payload["status"] = map_status(payload["status"])
 
     # ===============================
-    # LOG DETALLADO (CLAVE DEBUG)
+    # LOG DEBUG
     # ===============================
     logger.info("========== GHL UPDATE REQUEST ==========")
     logger.info(f"Opportunity ID: {opportunity_id}")
-    logger.info(f"Status raw: {status} → normalized: {status_final}")
-    logger.info(f"Pipeline Stage ID: {pipeline_stage_id}")
-    logger.info(f"Monetary Value: {monetary_value}")
-    logger.info(f"Full Payload: {payload}")
+    logger.info(f"Payload: {payload}")
 
     # ===============================
-    # VALIDACIÓN PRE-REQUEST
+    # VALIDACIÓN
     # ===============================
     validation_errors = validate_payload(payload)
 
     if validation_errors:
-        logger.error("PAYLOAD VALIDATION FAILED:")
+        logger.error("PAYLOAD VALIDATION FAILED")
         for err in validation_errors:
             logger.error(f" - {err}")
         return {"error": "validation_failed", "details": validation_errors}
@@ -108,14 +88,10 @@ def update_opportunity(
     try:
         response = requests.put(url, json=payload, headers=headers, timeout=10)
 
-        # ===============================
-        # DEBUG REAL DE GHL (CLAVE)
-        # ===============================
         logger.info(f"GHL RESPONSE STATUS: {response.status_code}")
         logger.info(f"GHL RESPONSE BODY: {response.text}")
 
         if response.status_code >= 400:
-            logger.error("GHL REJECTED REQUEST")
             return {
                 "error": "ghl_rejected",
                 "status_code": response.status_code,
@@ -123,14 +99,7 @@ def update_opportunity(
                 "sent_payload": payload
             }
 
-        result = response.json()
-
-        logger.info(
-            f"SUCCESS update opp {opportunity_id} | "
-            f"status={status_final} | stage={pipeline_stage_id}"
-        )
-
-        return result
+        return response.json()
 
     except requests.RequestException as e:
         logger.error("REQUEST FAILED")
