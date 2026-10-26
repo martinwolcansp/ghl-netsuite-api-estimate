@@ -2,9 +2,11 @@
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+import hmac
 import logging
 
 from app.services.ghl_service import sync_estimate_to_ghl
+from app.core.config import WEBHOOK_SECRET
 
 router = APIRouter(prefix="/webhook/netsuite", tags=["NetSuite"])
 
@@ -13,6 +15,24 @@ logger = logging.getLogger("netsuite_webhooks")
 
 @router.post("/estimate-approved")
 async def estimate_approved(request: Request):
+
+    # ===============================
+    # SECRETO COMPARTIDO (servidor local)
+    # ===============================
+    # Sólo se exige si WEBHOOK_SECRET tiene valor. Acepta el header
+    # X-Integration-Secret o el parámetro ?token=.
+    if WEBHOOK_SECRET:
+        recibido = (
+            request.headers.get("X-Integration-Secret")
+            or request.query_params.get("token")
+            or ""
+        )
+        if not hmac.compare_digest(recibido, WEBHOOK_SECRET):
+            logger.warning("Webhook rechazado: secreto ausente o inválido")
+            return JSONResponse(
+                status_code=401,
+                content={"error": "unauthorized"}
+            )
 
     try:
         payload = await request.json()

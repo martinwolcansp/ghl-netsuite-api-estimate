@@ -2,7 +2,7 @@
 
 import requests
 import logging
-from app.core.config import GHL_API_KEY, GHL_BASE_URL
+from app.core.config import GHL_API_KEY, GHL_BASE_URL, MODO_SIMULACION
 
 logger = logging.getLogger("ghl_client")
 
@@ -81,6 +81,20 @@ def update_opportunity(opportunity_id, payload):
         for err in validation_errors:
             logger.error(f" - {err}")
         return {"error": "validation_failed", "details": validation_errors}
+
+    # ===============================
+    # MODO SIMULACIÓN (servidor local)
+    # ===============================
+    # No escribe en GHL: registra el PUT exacto que habría hecho.
+    if MODO_SIMULACION:
+        logger.info(f"[SIMULACION] PUT {url}")
+        logger.info(f"[SIMULACION] Payload: {payload}")
+        return {
+            "simulado": True,
+            "method": "PUT",
+            "url": url,
+            "payload": payload
+        }
 
     # ===============================
     # REQUEST
