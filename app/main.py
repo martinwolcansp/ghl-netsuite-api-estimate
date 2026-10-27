@@ -3,6 +3,7 @@ import logging
 
 from app.routers import netsuite_webhooks
 from app.core.config import MODO_SIMULACION, WEBHOOK_SECRET
+from app import registro_eventos
 
 # =========================
 # Logging
@@ -17,7 +18,8 @@ logger = logging.getLogger("netsuite-api")
 
 logger.info(
     f"Arranque: MODO_SIMULACION={MODO_SIMULACION} | "
-    f"WEBHOOK_SECRET={'configurado' if WEBHOOK_SECRET else 'vacío (no se exige)'}"
+    f"WEBHOOK_SECRET={'configurado' if WEBHOOK_SECRET else 'vacío (no se exige)'} | "
+    f"REGISTRO_EVENTOS={registro_eventos.descripcion()}"
 )
 
 # =========================

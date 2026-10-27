@@ -4,17 +4,52 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 import hmac
 import logging
+import time
 
 from app.services.ghl_service import sync_estimate_to_ghl
 from app.core.config import WEBHOOK_SECRET
+from app import registro_eventos
 
 router = APIRouter(prefix="/webhook/netsuite", tags=["NetSuite"])
 
 logger = logging.getLogger("netsuite_webhooks")
 
 
+def _detalle_error(result):
+    """Texto corto del error para el registro de eventos."""
+    error = result.get("error")
+    partes = [str(error)]
+    if result.get("status_code"):
+        partes.append(f"HTTP {result['status_code']}")
+    if result.get("response"):
+        partes.append(str(result["response"])[:300])
+    if result.get("stage_received"):
+        partes.append(f"etapa recibida {result['stage_received']}")
+    return " · ".join(partes)
+
+
 @router.post("/estimate-approved")
 async def estimate_approved(request: Request):
+
+    inicio = time.monotonic()
+    payload = None
+
+    # ===============================
+    # REGISTRO DE EVENTOS (pestaña En vivo)
+    # ===============================
+    # No cambia la respuesta: se escribe en segundo plano.
+    def registrar(resultado, respuesta=None, detalle=None):
+        referencia = payload.get("estimateId") if isinstance(payload, dict) else None
+        registro_eventos.registrar(
+            etapa="presupuesto",
+            origen="netsuite",
+            resultado=resultado,
+            referencia_id=referencia,
+            detalle=detalle,
+            payload=payload,
+            respuesta=respuesta,
+            duracion_ms=int((time.monotonic() - inicio) * 1000),
+        )
 
     # ===============================
     # SECRETO COMPARTIDO (servidor local)
@@ -29,6 +64,7 @@ async def estimate_approved(request: Request):
         )
         if not hmac.compare_digest(recibido, WEBHOOK_SECRET):
             logger.warning("Webhook rechazado: secreto ausente o inválido")
+            registrar("rechazado", detalle="Secreto ausente o inválido")
             return JSONResponse(
                 status_code=401,
                 content={"error": "unauthorized"}
@@ -54,9 +90,11 @@ async def estimate_approved(request: Request):
 
         for field in required_fields:
             if field not in payload:
+                contenido = {"error": f"Falta campo requerido: {field}"}
+                registrar("error", contenido, contenido["error"])
                 return JSONResponse(
                     status_code=400,
-                    content={"error": f"Falta campo requerido: {field}"}
+                    content=contenido
                 )
 
         # ===============================
@@ -86,18 +124,30 @@ async def estimate_approved(request: Request):
         )
 
         if "error" in result:
+            contenido = {"status": "error", "detail": result}
+            registrar("error", contenido, _detalle_error(result))
             return JSONResponse(
                 status_code=400,
-                content={"status": "error", "detail": result}
+                content=contenido
             )
 
-        return {
+        contenido = {
             "status": "ok",
             "result": result
         }
 
+        if result.get("status") == "already_updated":
+            registrar("already_updated", contenido)
+        elif result.get("simulado"):
+            registrar("simulado", contenido)
+        else:
+            registrar("updated", contenido)
+
+        return contenido
+
     except Exception as e:
         logger.error(f"ERROR WEBHOOK: {str(e)}")
+        registrar("error", {"error": str(e)}, str(e))
 
         return JSONResponse(
             status_code=500,
